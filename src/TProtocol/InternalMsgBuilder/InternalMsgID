@@ -1,0 +1,13 @@
+TMSG_MARK : 1000000
+
+GATE_2_LOGIC_REGISTER   //网关注册到逻辑服务器
+
+GATE_2_LOGIC_TRANSFER_CLIENT   //网关消息到逻辑服务器
+LOGIC_2_GATE_TRANSFER_CLIENT   //逻辑服务器消息到网关
+
+GATE_2_LOGIC_KICK_SESSION   //网关通知逻辑服务器踢人
+
+TMSG_MARK : 1001000
+
+
+
