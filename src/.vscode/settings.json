@@ -1,5 +1,4 @@
 {
     //"go.gopath": "D:\\Program\\HXX\\Program\\Server",
-    "go.gopath": "${workspaceFolder}/../",
-    
+    "go.gopath": "${workspaceFolder}/../"
 }
