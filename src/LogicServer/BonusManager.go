@@ -1,7 +1,17 @@
+//Package logicserver BonusManager
 package logicserver
+
+import tcore "TCore"
 
 const cMaxProbability uint32 = 1000000
 
+//计算出来的奖励结构
+type sObtainItem struct {
+	mID  int32
+	mNum int32
+}
+
+//预加载的奖励数据结构
 type sBonusItem struct {
 	mItemID      int32
 	mMaxNum      int32
@@ -70,12 +80,12 @@ func (pOwn *sBonusManager) calcBonus(aBounsID int32) []sObtainItem {
 	}
 	var out []sObtainItem
 	if pCurBonus.mType == 1 {
-		p := gServerSingleton.randUint32() % cMaxProbability
+		p := tcore.RandUint32() % cMaxProbability
 		var tempP uint32
 		for _, v := range pCurBonus.mList {
 			tempP += v.mProbability
 			if tempP > p {
-				nNum := gServerSingleton.randUint32Range(uint32(v.mMinNum), uint32(v.mMaxNum))
+				nNum := tcore.RandUint32Range(uint32(v.mMinNum), uint32(v.mMaxNum))
 				out = append(out, sObtainItem{v.mItemID, int32(nNum)})
 				break
 			}
@@ -83,9 +93,9 @@ func (pOwn *sBonusManager) calcBonus(aBounsID int32) []sObtainItem {
 		}
 	} else if pCurBonus.mType == 2 {
 		for _, v := range pCurBonus.mList {
-			p := gServerSingleton.randUint32() % cMaxProbability
+			p := tcore.RandUint32() % cMaxProbability
 			if v.mProbability > p {
-				nNum := gServerSingleton.randUint32Range(uint32(v.mMinNum), uint32(v.mMaxNum))
+				nNum := tcore.RandUint32Range(uint32(v.mMinNum), uint32(v.mMaxNum))
 				out = append(out, sObtainItem{v.mItemID, int32(nNum)})
 			}
 		}

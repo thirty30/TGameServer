@@ -1,11 +1,23 @@
+//Package gateserver strcut
 package gateserver
 
 import (
+	tcore "TCore"
 	tnet "TNet"
 	tp "TProtocol"
 	"encoding/binary"
 	"time"
 )
+
+func _Log(aFormat string, aParms ...interface{}) {
+	gServerSingleton.mLogManager.Log(aFormat, aParms...)
+}
+func _Warning(aFormat string, aParms ...interface{}) {
+	gServerSingleton.mLogManager.Warning(aFormat, aParms...)
+}
+func _Error(aFormat string, aParms ...interface{}) {
+	gServerSingleton.mLogManager.Error(aFormat, aParms...)
+}
 
 var gServerSingleton *GateServer
 
@@ -13,7 +25,7 @@ var gServerSingleton *GateServer
 type GateServer struct {
 	mRun           bool
 	mConfig        sConfig
-	mLogManager    sLog
+	mLogManager    tcore.TLog
 	mNet           tnet.TCPReactor
 	mMsgHandlerMap map[int32]msgHandler
 
@@ -28,9 +40,8 @@ func (pOwn *GateServer) Init() bool {
 		return false
 	}
 
-	var err error
 	//init log manager
-	err = pOwn.mLogManager.init(pOwn.mConfig.LogLevel)
+	err := pOwn.mLogManager.Init("./log/GateServer", pOwn.mConfig.LogLevel, (pOwn.mConfig.IsDebug == 1))
 	if err != nil {
 		return false
 	}
@@ -40,10 +51,18 @@ func (pOwn *GateServer) Init() bool {
 	pOwn.registerHandler()
 	pOwn.mNet.Init()
 	pOwn.mNet.RegisterCallBack(pOwn.onConnected, pOwn.onDisconnect, pOwn.onReceive, pOwn.onException)
-	pOwn.mNet.ConnectHost("127.0.0.1", uint16(pOwn.mConfig.LogicPort))
-	//pOwn.mNet.Listen(uint16(pOwn.mConfig.ExternalPort))
+	err = pOwn.mNet.ConnectHost("127.0.0.1", uint16(pOwn.mConfig.LogicPort))
+	if err != nil {
+		_Error(err.Error())
+		return false
+	}
+	err = pOwn.mNet.Listen(uint16(pOwn.mConfig.ExternalPort))
+	if err != nil {
+		_Error(err.Error())
+		return false
+	}
 
-	pOwn.getLogManager().log("GateServer started...")
+	_Log("GateServer started...")
 	return true
 }
 
@@ -57,7 +76,7 @@ func (pOwn *GateServer) Run() {
 
 //Clear exported
 func (pOwn *GateServer) Clear() {
-
+	pOwn.mLogManager.Clear()
 }
 
 func (pOwn *GateServer) onConnected(aSessionID uint64) {
@@ -123,8 +142,4 @@ func (pOwn *GateServer) sendMsgToLogic(aSessionID uint64, aMsgID int32, aMsg tp.
 
 func (pOwn *GateServer) getConfig() *sConfig {
 	return &pOwn.mConfig
-}
-
-func (pOwn *GateServer) getLogManager() *sLog {
-	return &pOwn.mLogManager
 }

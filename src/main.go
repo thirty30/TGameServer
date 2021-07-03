@@ -9,12 +9,6 @@ import (
 	logic "LogicServer"
 )
 
-type iServer interface {
-	Init() bool
-	Run()
-	Clear()
-}
-
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Println("-[ logic | gate ]")
@@ -23,24 +17,27 @@ func main() {
 
 	switch os.Args[1] {
 	case "-logic":
-		pServer := new(logic.LogicServer)
-		defer pServer.Clear()
-		if pServer.Init() == true {
-			pServer.Run()
+		{
+			pServer := new(logic.LogicServer)
+			defer pServer.Clear()
+			if pServer.Init() == true {
+				pServer.Run()
+			}
 		}
-		break
 
 	case "-gate":
-		pServer := new(gate.GateServer)
-		defer pServer.Clear()
-		if pServer.Init() == true {
-			pServer.Run()
+		{
+			pServer := new(gate.GateServer)
+			defer pServer.Clear()
+			if pServer.Init() == true {
+				pServer.Run()
+			}
 		}
-		break
 
 	case "-debugall":
-		startAll()
-		break
+		{
+			startAll()
+		}
 
 	default:
 		fmt.Println("wrong args!")
@@ -66,7 +63,7 @@ func startAll() {
 		}
 	}()
 
-	for true {
+	for {
 		time.Sleep(time.Second)
 	}
 }

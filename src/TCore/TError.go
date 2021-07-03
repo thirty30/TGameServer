@@ -1,3 +1,4 @@
+//Package tcore error object
 package tcore
 
 import (

@@ -5,5 +5,4 @@ type sPlayer struct {
 	mUserID     string
 	mRenamed    bool
 	mPlayerName string
-	mLevel      int32
 }

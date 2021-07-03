@@ -54,7 +54,7 @@ func (pOwn *sMonitor) statisticTime() {
 		num := v.mTotalNum
 		aveTime := tTime / float32(num)
 		lTime := float32(v.mLongestTime) / float32(1000000)
-		gServerSingleton.getLogManager().warning("--Monitor-- elapsed time: %s total num: %d, total time:%.2fms, ave time: %.2fms, longest time: %.2fms", v.mFuncName, num, tTime, aveTime, lTime)
+		_Warning("--Monitor-- elapsed time: %s total num: %d, total time:%.2fms, ave time: %.2fms, longest time: %.2fms", v.mFuncName, num, tTime, aveTime, lTime)
 	}
 	pOwn.mLock.Unlock()
 }
@@ -65,8 +65,8 @@ func (pOwn *sMonitor) loop() {
 		time.Sleep(time.Minute * 1)
 		runtime.ReadMemStats(&memStats)
 		pOwn.statisticTime()
-		gServerSingleton.getLogManager().warning("--Monitor-- current goroutine num:%d", runtime.NumGoroutine())
+		_Warning("--Monitor-- current goroutine num:%d", runtime.NumGoroutine())
 		memUse := float32(memStats.Alloc) / float32(1024) / float32(1024)
-		gServerSingleton.getLogManager().warning("--Monitor-- current use mem:%.2f MB", memUse)
+		_Warning("--Monitor-- current use mem:%.2f MB", memUse)
 	}
 }

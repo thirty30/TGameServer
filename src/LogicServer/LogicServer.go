@@ -1,18 +1,26 @@
 package logicserver
 
 import (
-	"Rof"
-	"TCore"
+	rof "Rof"
+	tcore "TCore"
 	tnet "TNet"
 	tp "TProtocol"
 	"encoding/binary"
-	"math/rand"
-	"time"
 )
 
 const (
 	cDBCryptoKey = "thirty1234567890" //数据库加解密密钥
 )
+
+func _Log(aFormat string, aParms ...interface{}) {
+	gServerSingleton.mLogManager.Log(aFormat, aParms...)
+}
+func _Warning(aFormat string, aParms ...interface{}) {
+	gServerSingleton.mLogManager.Warning(aFormat, aParms...)
+}
+func _Error(aFormat string, aParms ...interface{}) {
+	gServerSingleton.mLogManager.Error(aFormat, aParms...)
+}
 
 var gServerSingleton *LogicServer
 
@@ -21,7 +29,7 @@ type LogicServer struct {
 	mRun           bool
 	mConfig        sConfig
 	mNet           tnet.TCPReactor
-	mLogManager    sLog
+	mLogManager    tcore.TLog
 	mRofManager    rof.RofManager
 	mBonusManager  sBonusManager
 	mDBManager     sDBManager
@@ -49,32 +57,32 @@ func (pOwn *LogicServer) Init() bool {
 	}
 
 	//init log manager
-	err = pOwn.mLogManager.init(pOwn.mConfig.LogLevel)
+	err = pOwn.mLogManager.Init("./log/LogicServer", pOwn.mConfig.LogLevel, (pOwn.mConfig.IsDebug == 1))
 	if err != nil {
+		return false
+	}
+
+	//init resource of file
+	err = pOwn.mRofManager.Init()
+	if err != nil {
+		_Error(err.Error())
 		return false
 	}
 
 	//init debug mode
 	pOwn.initDebugMode()
 
-	//init resource of file
-	err = pOwn.mRofManager.Init()
-	if err != nil {
-		pOwn.mLogManager.error(err.Error())
-		return false
-	}
-
 	//init db
 	pConfig := pOwn.mConfig
 	err = pOwn.mDBManager.init(pConfig.DBPath, pConfig.DBPort, pConfig.DBName, pConfig.DBUser, pConfig.DBPwd, cDBCryptoKey)
 	if err != nil {
-		pOwn.getLogManager().error("Init db manager fail," + err.Error())
+		_Error("Init db manager fail," + err.Error())
 		return false
 	}
 
 	//init net
 	if pOwn.initNet() == false {
-		pOwn.getLogManager().error("Init net fail...")
+		_Error("Init net fail...")
 		return false
 	}
 
@@ -83,7 +91,7 @@ func (pOwn *LogicServer) Init() bool {
 		return false
 	}
 
-	pOwn.getLogManager().log("LogicServer started...")
+	_Log("LogicServer started...")
 	return true
 }
 
@@ -98,7 +106,7 @@ func (pOwn *LogicServer) Run() {
 //Clear export
 func (pOwn *LogicServer) Clear() {
 	//pOwn.mDBManager.Clear()
-	pOwn.mLogManager.clear()
+	pOwn.mLogManager.Clear()
 }
 
 //init http net
@@ -170,28 +178,11 @@ func (pOwn *LogicServer) initDebugMode() {
 func (pOwn *LogicServer) initLogicManager() bool {
 	err := pOwn.getBonusManager().init()
 	if err != nil {
-		pOwn.getLogManager().error("Init bonus manager fail," + err.Error())
+		_Error("Init bonus manager fail," + err.Error())
 		return false
 	}
 
 	return true
-}
-
-func (pOwn *LogicServer) getNowTimeStamp() int64 {
-	return time.Now().Unix()
-}
-
-//随机数
-func (pOwn *LogicServer) randUint32() uint32 {
-	return rand.Uint32()
-}
-
-//随机范围
-func (pOwn *LogicServer) randUint32Range(aMin uint32, aMax uint32) uint32 {
-	if aMax-aMin == 0 {
-		return aMin
-	}
-	return rand.Uint32()%(aMax-aMin) + aMin
 }
 
 func (pOwn *LogicServer) getConfig() *sConfig {
@@ -204,10 +195,6 @@ func (pOwn *LogicServer) getRofManager() *rof.RofManager {
 
 func (pOwn *LogicServer) getDBManager() *sDBManager {
 	return &pOwn.mDBManager
-}
-
-func (pOwn *LogicServer) getLogManager() *sLog {
-	return &pOwn.mLogManager
 }
 
 func (pOwn *LogicServer) getMonitor() *sMonitor {

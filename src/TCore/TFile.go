@@ -1,6 +1,8 @@
+//Package tcore basic file
 package tcore
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -11,7 +13,8 @@ type TFileCreateInterval int64
 
 //时间间隔单位
 const (
-	TFileMinute TFileCreateInterval = 1
+	TFileSecond TFileCreateInterval = 1
+	TFileMinute                     = TFileSecond * 60
 	TFileHour                       = TFileMinute * 60
 	TFileDay                        = TFileHour * 24
 )
@@ -77,15 +80,15 @@ func (pOwn *TFile) openFile() error {
 	if pOwn.mFileMode == TFileModeNew {
 		pOwn.mFileHandler, err = os.Create(realFileName)
 		if err != nil {
-			return TNewError(err.Error())
+			return err
 		}
 	} else if pOwn.mFileMode == TFileModeAppend {
 		pOwn.mFileHandler, err = os.OpenFile(realFileName, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 		if err != nil {
-			return TNewError(err.Error())
+			return err
 		}
 	} else {
-		return TNewError("Wrong File Mode!")
+		return errors.New("wrong file mode")
 	}
 	return nil
 }
@@ -95,7 +98,7 @@ func (pOwn *TFile) WriteFile(aFormat string, aParms ...interface{}) error {
 	pBuf := new(sTFileBuffer)
 	_, err := fmt.Fprintf(pBuf, aFormat, aParms...)
 	if err != nil {
-		return TNewError(err.Error())
+		return err
 	}
 	pOwn.mChanWrite <- pBuf
 	return nil
@@ -108,7 +111,7 @@ func (pOwn *TFile) Clear() {
 
 //write data to real file
 func (pOwn *TFile) doWrite() {
-	for true {
+	for {
 		select {
 		case pTempBuf := <-pOwn.mChanWrite:
 			pOwn.mFileHandler.Write(pTempBuf.mBuffer)
@@ -120,7 +123,7 @@ func (pOwn *TFile) doWrite() {
 				pOwn.mChanRecreate <- true
 			} else if op == 2 {
 				pOwn.mFileHandler.Close()
-				pOwn.mChanHasClose <- true
+				pOwn.mChanHasClose <- true //todo: close the timer goroutine
 			}
 
 		}
@@ -139,8 +142,8 @@ func (pOwn *TFile) getRealFileName() string {
 
 func (pOwn *TFile) timer() {
 	lastTime := time.Now().Unix()
-	for true {
-		if time.Now().Unix() > (lastTime + int64(pOwn.mInterval*60)) {
+	for {
+		if time.Now().Unix() > (lastTime + int64(pOwn.mInterval)) {
 			pOwn.mChanNotify <- 1
 			<-pOwn.mChanRecreate
 			lastTime = time.Now().Unix()

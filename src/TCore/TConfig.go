@@ -1,3 +1,4 @@
+//Package tcore config file
 package tcore
 
 import (
@@ -27,12 +28,12 @@ func (pOwn *TConfig) Analysis(aFileName string) bool {
 	defer file.Close()
 	pOwn.mMap = make(map[string]string)
 	reader := bufio.NewReader(file)
-	for true {
-		bytes, isPrefix, err := reader.ReadLine()
+	for {
+		bytes, bIsPrefix, err := reader.ReadLine()
 		if err == io.EOF {
 			break
 		}
-		if err != nil || isPrefix == true {
+		if err != nil || bIsPrefix == true {
 			return false
 		}
 
@@ -45,8 +46,10 @@ func (pOwn *TConfig) Analysis(aFileName string) bool {
 			continue
 		}
 		str3 := strings.Split(str2[0], "=")
-		if str3[0] != "" {
+		if len(str3) == 2 && str3[0] != "" && str3[1] != "" {
 			pOwn.mMap[str3[0]] = str3[1]
+		} else {
+			return false
 		}
 	}
 	return true
@@ -54,8 +57,8 @@ func (pOwn *TConfig) Analysis(aFileName string) bool {
 
 //GetDataInt32 export
 func (pOwn *TConfig) GetDataInt32(aKey string) (int32, bool) {
-	value, isOK := pOwn.mMap[aKey]
-	if isOK == false {
+	value, bIsOK := pOwn.mMap[aKey]
+	if bIsOK == false {
 		return 0, false
 	}
 	nRes, err := strconv.Atoi(value)

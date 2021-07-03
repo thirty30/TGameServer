@@ -1,3 +1,4 @@
+//Package logicserver MessageHandler
 package logicserver
 
 import (
@@ -21,7 +22,7 @@ func (pOwn *LogicServer) registerHandler() {
 
 func (pOwn *LogicServer) handlerGateConnected(aSessionID uint64, aBuffer []byte, aSize uint32) {
 	pOwn.mGateSessionID = aSessionID
-	pOwn.getLogManager().log("GateServer is connected!")
+	_Log("GateServer is connected!")
 }
 
 func (pOwn *LogicServer) handlerReDispathMsg(aSessionID uint64, aBuffer []byte, aSize uint32) {

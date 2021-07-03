@@ -1,57 +1,62 @@
-package logicserver
+//Package tcore log file
+package tcore
 
 import (
-	"TCore"
 	"fmt"
 	"os"
 	"time"
 )
 
-type sLog struct {
-	mFile     tcore.TFile
+type TLog struct {
+	mFilePath string
 	mLogLevel int32
+	mIsPrint  bool
+	mFile     TFile
 }
 
-func (pOwn *sLog) init(aLogLevel int32) error {
+func (pOwn *TLog) Init(aFilePath string, aLogLevel int32, aIsPrint bool) error {
+	pOwn.mFilePath = aFilePath
 	pOwn.mLogLevel = aLogLevel
-	return pOwn.mFile.Init("./log/LogicServer", -1, tcore.TFileModeNew, tcore.TFileDay)
+	pOwn.mIsPrint = aIsPrint
+
+	return pOwn.mFile.Init(pOwn.mFilePath, -1, TFileModeNew, TFileDay)
 }
 
-func (pOwn *sLog) formatTimeString() string {
+func (pOwn *TLog) formatTimeString() string {
 	now := time.Now()
 	return fmt.Sprintf("%d-%02d-%02d %02d:%02d:%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 }
 
-func (pOwn *sLog) log(aFormat string, aParms ...interface{}) {
+func (pOwn *TLog) Log(aFormat string, aParms ...interface{}) {
 	str := pOwn.formatTimeString() + " [LOG] " + aFormat + "\n"
 	if 1 >= pOwn.mLogLevel {
 		pOwn.mFile.WriteFile(str, aParms...)
 	}
-	if gServerSingleton.getConfig().IsDebug == 1 {
+	if pOwn.mIsPrint == true {
 		fmt.Fprintf(os.Stdout, str, aParms...)
 	}
 }
 
-func (pOwn *sLog) warning(aFormat string, aParms ...interface{}) {
+func (pOwn *TLog) Warning(aFormat string, aParms ...interface{}) {
 	str := pOwn.formatTimeString() + " [WARNING] " + aFormat + "\n"
 	if 2 >= pOwn.mLogLevel {
 		pOwn.mFile.WriteFile(str, aParms...)
 	}
-	if gServerSingleton.getConfig().IsDebug == 1 {
+	if pOwn.mIsPrint == true {
 		fmt.Fprintf(os.Stdout, str, aParms...)
 	}
 }
 
-func (pOwn *sLog) error(aFormat string, aParms ...interface{}) {
+func (pOwn *TLog) Error(aFormat string, aParms ...interface{}) {
 	str := pOwn.formatTimeString() + " [ERROR] " + aFormat + "\n"
 	if 3 >= pOwn.mLogLevel {
 		pOwn.mFile.WriteFile(str, aParms...)
 	}
-	if gServerSingleton.getConfig().IsDebug == 1 {
+	if pOwn.mIsPrint == true {
 		fmt.Fprintf(os.Stdout, str, aParms...)
 	}
 }
 
-func (pOwn *sLog) clear() {
+func (pOwn *TLog) Clear() {
 	pOwn.mFile.Clear()
 }

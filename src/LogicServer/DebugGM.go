@@ -14,7 +14,6 @@ func (pOwn *sDebugGM) dispatchCommand(aPlayerID string, aCommand string) {
 		{
 			pOwn.addItem(aPlayerID, parm[1:])
 		}
-		break
 	}
 }
 

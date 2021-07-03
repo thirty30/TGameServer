@@ -1,3 +1,4 @@
+//Package gateserver MessageHandler
 package gateserver
 
 import (

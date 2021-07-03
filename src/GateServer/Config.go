@@ -1,10 +1,9 @@
 package gateserver
 
-import "TCore"
+import tcore "TCore"
 
 type sConfig struct {
 	ExternalPort int32
-	InternalPort int32
 	LogicPort    int32
 	LogLevel     int32
 
@@ -19,10 +18,6 @@ func (pOwn *GateServer) initConfig() bool {
 	}
 	var isOK bool
 	pOwn.mConfig.ExternalPort, isOK = config.GetDataInt32("ExternalGatePort")
-	if isOK != true {
-		return false
-	}
-	pOwn.mConfig.InternalPort, isOK = config.GetDataInt32("InternalGatePort")
 	if isOK != true {
 		return false
 	}

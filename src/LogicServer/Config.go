@@ -1,6 +1,7 @@
+//Package logicserver Config
 package logicserver
 
-import "TCore"
+import tcore "TCore"
 
 type sConfig struct {
 	ServerID  int32
@@ -58,6 +59,7 @@ func (pOwn *LogicServer) initConfig() bool {
 		return false
 	}
 
+	//Debug Mode//
 	pOwn.mConfig.GMEnalbe, isOK = config.GetDataInt32("GMEnable")
 	if isOK != true {
 		return false

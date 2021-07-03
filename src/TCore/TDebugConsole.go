@@ -1,3 +1,4 @@
+//Package tcore debug console
 package tcore
 
 import "fmt"
@@ -17,7 +18,7 @@ func (pOwn *DebugConsole) Init(aFunc CommandCallBack) {
 }
 
 func (pOwn *DebugConsole) loopInput() {
-	for true {
+	for {
 		var cmd string
 		fmt.Scanln(&cmd)
 		pOwn.mCallBack(cmd)
