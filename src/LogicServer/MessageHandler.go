@@ -22,7 +22,7 @@ func (pOwn *LogicServer) registerHandler() {
 
 func (pOwn *LogicServer) handlerGateConnected(aSessionID uint64, aBuffer []byte, aSize uint32) {
 	pOwn.mGateSessionID = aSessionID
-	_Log("GateServer is connected!")
+	_LOG(LT_LOG, "GateServer is connected!")
 }
 
 func (pOwn *LogicServer) handlerReDispathMsg(aSessionID uint64, aBuffer []byte, aSize uint32) {

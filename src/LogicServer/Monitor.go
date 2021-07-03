@@ -54,19 +54,19 @@ func (pOwn *sMonitor) statisticTime() {
 		num := v.mTotalNum
 		aveTime := tTime / float32(num)
 		lTime := float32(v.mLongestTime) / float32(1000000)
-		_Warning("--Monitor-- elapsed time: %s total num: %d, total time:%.2fms, ave time: %.2fms, longest time: %.2fms", v.mFuncName, num, tTime, aveTime, lTime)
+		_LOG(LT_WARNING, "--Monitor-- elapsed time: %s total num: %d, total time:%.2fms, ave time: %.2fms, longest time: %.2fms", v.mFuncName, num, tTime, aveTime, lTime)
 	}
 	pOwn.mLock.Unlock()
 }
 
 func (pOwn *sMonitor) loop() {
 	var memStats runtime.MemStats
-	for true {
+	for {
 		time.Sleep(time.Minute * 1)
 		runtime.ReadMemStats(&memStats)
 		pOwn.statisticTime()
-		_Warning("--Monitor-- current goroutine num:%d", runtime.NumGoroutine())
+		_LOG(LT_WARNING, "--Monitor-- current goroutine num:%d", runtime.NumGoroutine())
 		memUse := float32(memStats.Alloc) / float32(1024) / float32(1024)
-		_Warning("--Monitor-- current use mem:%.2f MB", memUse)
+		_LOG(LT_WARNING, "--Monitor-- current use mem:%.2f MB", memUse)
 	}
 }

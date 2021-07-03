@@ -8,18 +8,30 @@ import (
 	"encoding/binary"
 )
 
+type LogType uint8
+
 const (
-	cDBCryptoKey = "thirty1234567890" //数据库加解密密钥
+	cDBCryptoKey         = "thirty1234567890" //数据库加解密密钥
+	LT_DEBUG     LogType = 0
+	LT_LOG       LogType = 1
+	LT_WARNING   LogType = 2
+	LT_ERROR     LogType = 3
 )
 
-func _Log(aFormat string, aParms ...interface{}) {
-	gServerSingleton.mLogManager.Log(aFormat, aParms...)
-}
-func _Warning(aFormat string, aParms ...interface{}) {
-	gServerSingleton.mLogManager.Warning(aFormat, aParms...)
-}
-func _Error(aFormat string, aParms ...interface{}) {
-	gServerSingleton.mLogManager.Error(aFormat, aParms...)
+func _LOG(aType LogType, aFormat string, aParms ...interface{}) {
+	switch aType {
+	case LT_DEBUG:
+		gServerSingleton.mLogManager.Debug(aFormat, aParms...)
+
+	case LT_LOG:
+		gServerSingleton.mLogManager.Log(aFormat, aParms...)
+
+	case LT_WARNING:
+		gServerSingleton.mLogManager.Warning(aFormat, aParms...)
+
+	case LT_ERROR:
+		gServerSingleton.mLogManager.Error(aFormat, aParms...)
+	}
 }
 
 var gServerSingleton *LogicServer
@@ -65,7 +77,7 @@ func (pOwn *LogicServer) Init() bool {
 	//init resource of file
 	err = pOwn.mRofManager.Init()
 	if err != nil {
-		_Error(err.Error())
+		_LOG(LT_ERROR, err.Error())
 		return false
 	}
 
@@ -76,13 +88,13 @@ func (pOwn *LogicServer) Init() bool {
 	pConfig := pOwn.mConfig
 	err = pOwn.mDBManager.init(pConfig.DBPath, pConfig.DBPort, pConfig.DBName, pConfig.DBUser, pConfig.DBPwd, cDBCryptoKey)
 	if err != nil {
-		_Error("Init db manager fail," + err.Error())
+		_LOG(LT_ERROR, "Init db manager fail,"+err.Error())
 		return false
 	}
 
 	//init net
 	if pOwn.initNet() == false {
-		_Error("Init net fail...")
+		_LOG(LT_ERROR, "Init net fail...")
 		return false
 	}
 
@@ -91,7 +103,8 @@ func (pOwn *LogicServer) Init() bool {
 		return false
 	}
 
-	_Log("LogicServer started...")
+	_LOG(LT_LOG, "LogicServer started...")
+	_LOG(LT_DEBUG, "sajdflkjasldjflasdf")
 	return true
 }
 
@@ -178,7 +191,7 @@ func (pOwn *LogicServer) initDebugMode() {
 func (pOwn *LogicServer) initLogicManager() bool {
 	err := pOwn.getBonusManager().init()
 	if err != nil {
-		_Error("Init bonus manager fail," + err.Error())
+		_LOG(LT_ERROR, "Init bonus manager fail,"+err.Error())
 		return false
 	}
 
