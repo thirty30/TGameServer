@@ -9,14 +9,29 @@ import (
 	"time"
 )
 
-func _Log(aFormat string, aParms ...interface{}) {
-	gServerSingleton.mLogManager.Log(aFormat, aParms...)
-}
-func _Warning(aFormat string, aParms ...interface{}) {
-	gServerSingleton.mLogManager.Warning(aFormat, aParms...)
-}
-func _Error(aFormat string, aParms ...interface{}) {
-	gServerSingleton.mLogManager.Error(aFormat, aParms...)
+type LogType uint8
+
+const (
+	LT_DEBUG   LogType = 0
+	LT_LOG     LogType = 1
+	LT_WARNING LogType = 2
+	LT_ERROR   LogType = 3
+)
+
+func _LOG(aType LogType, aFormat string, aParms ...interface{}) {
+	switch aType {
+	case LT_DEBUG:
+		gServerSingleton.mLogManager.Debug(aFormat, aParms...)
+
+	case LT_LOG:
+		gServerSingleton.mLogManager.Log(aFormat, aParms...)
+
+	case LT_WARNING:
+		gServerSingleton.mLogManager.Warning(aFormat, aParms...)
+
+	case LT_ERROR:
+		gServerSingleton.mLogManager.Error(aFormat, aParms...)
+	}
 }
 
 var gServerSingleton *GateServer
@@ -53,16 +68,16 @@ func (pOwn *GateServer) Init() bool {
 	pOwn.mNet.RegisterCallBack(pOwn.onConnected, pOwn.onDisconnect, pOwn.onReceive, pOwn.onException)
 	err = pOwn.mNet.ConnectHost("127.0.0.1", uint16(pOwn.mConfig.LogicPort))
 	if err != nil {
-		_Error(err.Error())
+		_LOG(LT_ERROR, err.Error())
 		return false
 	}
 	err = pOwn.mNet.Listen(uint16(pOwn.mConfig.ExternalPort))
 	if err != nil {
-		_Error(err.Error())
+		_LOG(LT_ERROR, err.Error())
 		return false
 	}
 
-	_Log("GateServer started...")
+	_LOG(LT_LOG, "GateServer started...")
 	return true
 }
 

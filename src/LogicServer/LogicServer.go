@@ -104,7 +104,6 @@ func (pOwn *LogicServer) Init() bool {
 	}
 
 	_LOG(LT_LOG, "LogicServer started...")
-	_LOG(LT_DEBUG, "sajdflkjasldjflasdf")
 	return true
 }
 
