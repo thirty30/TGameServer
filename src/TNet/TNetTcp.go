@@ -1,7 +1,7 @@
+//Package tnet tcp
 package tnet
 
 import (
-	tp "TProtocol"
 	"fmt"
 	"net"
 	"strconv"
@@ -26,28 +26,36 @@ type TCPReactor struct {
 	mRecvDataChannel    chan *sMessageObj       //分包好的管道
 
 	//callback func
-	mCallBackConnect    onConnect
-	mCallBackDisconnect onDisconnect
-	mCallBackReceive    onReceive
-	mCallBackException  onException
+	mCallBackConnect       onConnect
+	mCallBackDisconnect    onDisconnect
+	mCallBackReceive       onReceive
+	mCallBackException     onException
+	mCallBackGetPacketSize onGetPacketSize
 }
 
 //Init export
 func (pOwn *TCPReactor) Init() {
 	pOwn.mListenPort = 0
-	pOwn.mSessionIDGenerater = 100
+	pOwn.mSessionIDGenerater = 0
 	pOwn.mSessionMap = make(map[uint64]*sTCPSession)
-	pOwn.mAcceptConnChannel = make(chan *net.TCPConn, 65536)
-	pOwn.mNotifyCloseChannel = make(chan uint64, 65536)
-	pOwn.mRecvDataChannel = make(chan *sMessageObj, 102400)
+	pOwn.mAcceptConnChannel = make(chan *net.TCPConn, cAcceptChannelNum)
+	pOwn.mNotifyCloseChannel = make(chan uint64, cNotifyCloseChannelNum)
+	pOwn.mRecvDataChannel = make(chan *sMessageObj, cReceiveMsgChannelNum)
 }
 
 //RegisterCallBack export
-func (pOwn *TCPReactor) RegisterCallBack(aOnConnected onConnect, aOnDisconnected onDisconnect, aOnReceive onReceive, aOnException onException) {
+func (pOwn *TCPReactor) RegisterCallBack(
+	aOnConnected onConnect,
+	aOnDisconnected onDisconnect,
+	aOnReceive onReceive,
+	aOnException onException,
+	aOnGetPackageSize onGetPacketSize) {
+
 	pOwn.mCallBackConnect = aOnConnected
 	pOwn.mCallBackDisconnect = aOnDisconnected
 	pOwn.mCallBackReceive = aOnReceive
 	pOwn.mCallBackException = aOnException
+	pOwn.mCallBackGetPacketSize = aOnGetPackageSize
 }
 
 //Listen export
@@ -69,51 +77,69 @@ func (pOwn *TCPReactor) Listen(aPort uint16) error {
 }
 
 //EventDispatch export
-func (pOwn *TCPReactor) EventDispatch(aMaxNumPerDeal int, aSecondWait float64) {
-	s := time.Now()
-	nMsgCount := 0
-	select {
-	case pMsg := <-pOwn.mRecvDataChannel:
-		if pOwn.mCallBackReceive != nil {
-			pOwn.mCallBackReceive(pMsg.mSessionID, pMsg.mData, pMsg.mLen)
-		}
-		nMsgCount++
-		if nMsgCount >= aMaxNumPerDeal {
-			break
-		}
-	default:
-		if time.Since(s).Seconds() > aSecondWait {
-			break
+//aMaxNumPerDeal 每次处理消息的数量 负数代表处理完所有消息
+func (pOwn *TCPReactor) EventDispatch(aMaxNumPerDeal int32) {
+	bDeal := true
+	for bDeal == true {
+		select {
+		case nCloseSessionID := <-pOwn.mNotifyCloseChannel:
+			pSession, bExist := pOwn.mSessionMap[nCloseSessionID]
+			if bExist == false || pSession == nil {
+				break
+			}
+			pSession.mConn.Close()
+			close(pSession.mChWrite)
+			nSID := pSession.mSessionID
+			delete(pOwn.mSessionMap, nSID)
+			if pOwn.mCallBackDisconnect != nil {
+				pOwn.mCallBackDisconnect(nSID)
+			}
+
+		case pNewConn := <-pOwn.mAcceptConnChannel:
+			pSession := pOwn.newSession(pNewConn)
+			pOwn.mSessionMap[pSession.mSessionID] = pSession
+			go pOwn.simulConnectionRead(pSession)
+			go pOwn.simulConnectionWrite(pSession)
+			if pOwn.mCallBackConnect != nil {
+				pOwn.mCallBackConnect(pSession.mSessionID)
+			}
+
+		default:
+			bDeal = false
 		}
 	}
 
-	select {
-	case nCloseSessionID := <-pOwn.mNotifyCloseChannel:
-		pSession, bExist := pOwn.mSessionMap[nCloseSessionID]
-		if bExist == false || pSession == nil {
-			break
-		}
-		pSession.mConn.Close()
-		close(pSession.mChWrite)
-		nSID := pSession.mSessionID
-		delete(pOwn.mSessionMap, nSID)
-		if pOwn.mCallBackDisconnect != nil {
-			pOwn.mCallBackDisconnect(nSID)
-		}
+	//读数据
+	nMsgCount := int32(0)
+	bDeal = true
+	for bDeal == true {
+		select {
+		case pMsg := <-pOwn.mRecvDataChannel:
+			if pOwn.mCallBackReceive != nil {
+				pOwn.mCallBackReceive(pMsg.mSessionID, pMsg.mData, pMsg.mLen)
+			}
+			nMsgCount++
+			if aMaxNumPerDeal > 0 && nMsgCount >= aMaxNumPerDeal {
+				bDeal = false
+				break
+			}
+			continue
 
-	case pNewConn := <-pOwn.mAcceptConnChannel:
-		pSession := pOwn.newSession(pNewConn)
-		pOwn.mSessionMap[pSession.mSessionID] = pSession
-		go pOwn.simulConnectionRead(pSession)
-		go pOwn.simulConnectionWrite(pSession)
-		if pOwn.mCallBackConnect != nil {
-			pOwn.mCallBackConnect(pSession.mSessionID)
-		}
+		default:
+			bDeal = false
 
-	default:
-		break
+		}
 	}
+}
 
+func (pOwn *TCPReactor) newSession(aNewConn *net.TCPConn) *sTCPSession {
+	pSession := new(sTCPSession)
+	pOwn.mSessionIDGenerater++
+	pSession.mSessionID = pOwn.mSessionIDGenerater
+	pSession.mConn = aNewConn
+	pSession.mChWrite = make(chan []byte, cSessionWriteChanLen)
+	pSession.mReadBuffer = make([]byte, cSessionReadBufLen)
+	return pSession
 }
 
 //Write export
@@ -134,51 +160,51 @@ func (pOwn *TCPReactor) Close(aSessionID uint64, aMilliDelay int) {
 	go pOwn.simulClose(aSessionID, aMilliDelay)
 }
 
-func (pOwn *TCPReactor) newSession(aNewConn *net.TCPConn) *sTCPSession {
-	pSession := new(sTCPSession)
-	pOwn.mSessionIDGenerater++
-	pSession.mSessionID = pOwn.mSessionIDGenerater
-	pSession.mConn = aNewConn
-	pSession.mChWrite = make(chan []byte, 1024)
-	pSession.mReadBuffer = make([]byte, cSessionReadBufLen)
-	return pSession
-}
-
 func (pOwn *TCPReactor) simulAccpet(aListener *net.TCPListener) {
-	for true {
+	for {
 		pConn, err := aListener.AcceptTCP()
 		if err != nil {
 			continue
 		}
 		pOwn.mAcceptConnChannel <- pConn
 	}
-	aListener.Close()
 }
 
 func (pOwn *TCPReactor) simulConnectionRead(aSession *sTCPSession) {
 	aSession.mConn.SetKeepAlive(true)
-	for true {
+	for {
 		nRecvLen, err := aSession.mConn.Read(aSession.mReadBuffer[aSession.mReadBufferLen:])
 		if err != nil {
 			pOwn.mNotifyCloseChannel <- aSession.mSessionID
 			break
 		}
+		if nRecvLen == 0 && int(aSession.mReadBufferLen) == cap(aSession.mReadBuffer) {
+			newLen := cap(aSession.mReadBuffer) * 2
+			newBuf := make([]byte, newLen)
+			copy(newBuf, aSession.mReadBuffer)
+			aSession.mReadBuffer = newBuf
+			continue
+		}
 		if nRecvLen <= 0 {
 			continue
 		}
 		aSession.mReadBufferLen += uint32(nRecvLen)
-		if aSession.mReadBufferLen >= cSessionReadBufLen {
-			aSession.mReadBufferLen--
-		}
 
 		nLeftLen := aSession.mReadBufferLen
-		var nOffset uint32
-		for true {
-			if nLeftLen <= 0 {
+		nOffset := uint32(0)
+		for {
+			if nLeftLen == 0 {
 				aSession.mReadBufferLen = 0
 				break
 			}
-			nPackageLen := getPacketSize(aSession.mReadBuffer[nOffset:aSession.mReadBufferLen], nLeftLen)
+
+			nPackageLen := uint32(0)
+			if pOwn.mCallBackGetPacketSize == nil {
+				nPackageLen = nLeftLen
+			} else {
+				nPackageLen = pOwn.mCallBackGetPacketSize(aSession.mReadBuffer[nOffset:aSession.mReadBufferLen], nLeftLen)
+			}
+
 			if nPackageLen > 0 && nPackageLen <= nLeftLen {
 				pMsg := new(sMessageObj)
 				pMsg.mSessionID = aSession.mSessionID
@@ -189,7 +215,6 @@ func (pOwn *TCPReactor) simulConnectionRead(aSession *sTCPSession) {
 
 				nOffset += nPackageLen
 				nLeftLen -= nPackageLen
-
 				continue
 			}
 			if nOffset > 0 {
@@ -197,16 +222,14 @@ func (pOwn *TCPReactor) simulConnectionRead(aSession *sTCPSession) {
 				copy(tempBuffer, aSession.mReadBuffer[nOffset:aSession.mReadBufferLen])
 				copy(aSession.mReadBuffer, tempBuffer)
 				aSession.mReadBufferLen = nLeftLen
-				break
 			}
-
+			break
 		}
-
 	}
 }
 
 func (pOwn *TCPReactor) simulConnectionWrite(aSession *sTCPSession) {
-	for true {
+	for {
 		pBuffer, chErr := <-aSession.mChWrite
 		if chErr == false {
 			break
@@ -223,16 +246,6 @@ func (pOwn *TCPReactor) simulClose(aSessionID uint64, aMilliDelay int) {
 		time.Sleep(time.Millisecond * time.Duration(aMilliDelay))
 	}
 	pOwn.mNotifyCloseChannel <- aSessionID
-}
-
-func getPacketSize(aData []byte, aDataLen uint32) uint32 {
-	var msgHead tp.MessageHead
-	nHeadLen := msgHead.GetHeadSize()
-	if aDataLen < nHeadLen {
-		return 0
-	}
-	msgHead.Deserialize(aData, aDataLen)
-	return msgHead.BodySize + nHeadLen
 }
 
 //ConnectHost export

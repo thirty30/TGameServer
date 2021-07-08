@@ -34,6 +34,16 @@ func _LOG(aType LogType, aFormat string, aParms ...interface{}) {
 	}
 }
 
+func getMessagePacketSize(aData []byte, aDataLen uint32) uint32 {
+	var msgHead tp.MessageHead
+	nHeadLen := msgHead.GetHeadSize()
+	if aDataLen < nHeadLen {
+		return 0
+	}
+	msgHead.Deserialize(aData, aDataLen)
+	return msgHead.BodySize + nHeadLen
+}
+
 var gServerSingleton *GateServer
 
 //GateServer exported
@@ -65,13 +75,8 @@ func (pOwn *GateServer) Init() bool {
 	pOwn.mMsgHandlerMap = make(map[int32]msgHandler)
 	pOwn.registerHandler()
 	pOwn.mNet.Init()
-	pOwn.mNet.RegisterCallBack(pOwn.onConnected, pOwn.onDisconnect, pOwn.onReceive, pOwn.onException)
+	pOwn.mNet.RegisterCallBack(pOwn.onConnected, pOwn.onDisconnect, pOwn.onReceive, pOwn.onException, getMessagePacketSize)
 	err = pOwn.mNet.ConnectHost("127.0.0.1", uint16(pOwn.mConfig.LogicPort))
-	if err != nil {
-		_LOG(LT_ERROR, err.Error())
-		return false
-	}
-	err = pOwn.mNet.Listen(uint16(pOwn.mConfig.ExternalPort))
 	if err != nil {
 		_LOG(LT_ERROR, err.Error())
 		return false
@@ -84,8 +89,15 @@ func (pOwn *GateServer) Init() bool {
 //Run exported
 func (pOwn *GateServer) Run() {
 	for pOwn.mRun {
-		pOwn.mNet.EventDispatch(100, 0)
+		st := time.Now()
+
+		pOwn.mNet.EventDispatch(1000)
 		time.Sleep(time.Millisecond * 10)
+
+		lt := 20 - time.Since(st).Milliseconds() //服务器每秒50帧
+		if lt > 0 {
+			time.Sleep(time.Duration(lt) * time.Millisecond)
+		}
 	}
 }
 
@@ -97,11 +109,16 @@ func (pOwn *GateServer) Clear() {
 func (pOwn *GateServer) onConnected(aSessionID uint64) {
 	if pOwn.mLogicSessionID == 0 {
 		pOwn.mLogicSessionID = aSessionID
+
 		//告诉逻辑服务器连上了
 		var msgSend tp.CommonN8
 		pOwn.sendMsgToLogic(aSessionID, tp.GATE_2_LOGIC_REGISTER, &msgSend)
+
 		//监听外部端口
-		pOwn.mNet.Listen(uint16(pOwn.mConfig.ExternalPort))
+		err := pOwn.mNet.Listen(uint16(pOwn.mConfig.ExternalPort))
+		if err != nil {
+			_LOG(LT_ERROR, err.Error())
+		}
 	}
 }
 

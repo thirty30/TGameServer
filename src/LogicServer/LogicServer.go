@@ -6,6 +6,7 @@ import (
 	tnet "TNet"
 	tp "TProtocol"
 	"encoding/binary"
+	"time"
 )
 
 type LogType uint8
@@ -110,8 +111,15 @@ func (pOwn *LogicServer) Init() bool {
 //Run export
 func (pOwn *LogicServer) Run() {
 	for pOwn.mRun {
-		pOwn.mNet.EventDispatch(100, 0.01)
+		st := time.Now()
+
+		pOwn.mNet.EventDispatch(1000)
 		pOwn.mDBManager.eventDispatch()
+
+		lt := 20 - time.Since(st).Milliseconds() //服务器每秒50帧
+		if lt > 0 {
+			time.Sleep(time.Duration(lt) * time.Millisecond)
+		}
 	}
 }
 
@@ -121,14 +129,27 @@ func (pOwn *LogicServer) Clear() {
 	pOwn.mLogManager.Clear()
 }
 
+func getMessagePacketSize(aData []byte, aDataLen uint32) uint32 {
+	var msgHead tp.MessageHead
+	nHeadLen := msgHead.GetHeadSize()
+	if aDataLen < nHeadLen {
+		return 0
+	}
+	msgHead.Deserialize(aData, aDataLen)
+	return msgHead.BodySize + nHeadLen
+}
+
 //init http net
 func (pOwn *LogicServer) initNet() bool {
 	pOwn.mMsgHandlerMap = make(map[int32]msgHandler)
 	pOwn.registerHandler()
 	pOwn.mNet.Init()
-	pOwn.mNet.RegisterCallBack(pOwn.onConnected, pOwn.onDisconnect, pOwn.onReceive, pOwn.onException)
-	pOwn.mNet.Listen(uint16(pOwn.mConfig.LogicPort))
-
+	pOwn.mNet.RegisterCallBack(pOwn.onConnected, pOwn.onDisconnect, pOwn.onReceive, pOwn.onException, getMessagePacketSize)
+	err := pOwn.mNet.Listen(uint16(pOwn.mConfig.LogicPort))
+	if err != nil {
+		_LOG(LT_ERROR, err.Error())
+		return false
+	}
 	return true
 }
 

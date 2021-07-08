@@ -9,11 +9,10 @@ import (
 )
 
 type sWSSession struct {
-	mSessionID     uint64
-	mConn          *ws.Conn
-	mChWrite       chan []byte
-	mReadBuffer    []byte
-	mReadBufferLen uint32
+	mSessionID  uint64
+	mConn       *ws.Conn
+	mChWrite    chan []byte
+	mReadBuffer []byte
 }
 
 //WSReactor export
@@ -37,9 +36,9 @@ func (pOwn *WSReactor) Init() {
 	pOwn.mListenPort = 0
 	pOwn.mSessionIDGenerater = 1
 	pOwn.mSessionMap = make(map[uint64]*sWSSession)
-	pOwn.mAcceptConnChannel = make(chan *ws.Conn, cMaxConnectionNum)
-	pOwn.mNotifyCloseChannel = make(chan uint64, cMaxConnectionNum)
-	pOwn.mRecvDataChannel = make(chan *sMessageObj, cMsgQueueNum)
+	pOwn.mAcceptConnChannel = make(chan *ws.Conn, cAcceptChannelNum)
+	pOwn.mNotifyCloseChannel = make(chan uint64, cNotifyCloseChannelNum)
+	pOwn.mRecvDataChannel = make(chan *sMessageObj, cReceiveMsgChannelNum)
 }
 
 //RegisterCallBack export
@@ -80,52 +79,59 @@ func (pOwn *WSReactor) registerSession(aWriter http.ResponseWriter, aReq *http.R
 }
 
 //EventDispatch export
-func (pOwn *WSReactor) EventDispatch(aMaxNumPerDeal int, aSecondWait float64) {
-	s := time.Now()
-	nMsgCount := 0
-	select {
-	case pMsg := <-pOwn.mRecvDataChannel:
-		if pOwn.mCallBackReceive != nil {
-			pOwn.mCallBackReceive(pMsg.mSessionID, pMsg.mData, pMsg.mLen)
-		}
-		nMsgCount++
-		if nMsgCount >= aMaxNumPerDeal {
-			break
-		}
-	default:
-		if time.Since(s).Seconds() > aSecondWait {
-			break
+//aMaxNumPerDeal 每次处理消息的数量 负数代表处理完所有消息
+func (pOwn *WSReactor) EventDispatch(aMaxNumPerDeal int32) {
+	bDeal := true
+	for bDeal == true {
+		select {
+		case nCloseSessionID := <-pOwn.mNotifyCloseChannel:
+			pSession, bExist := pOwn.mSessionMap[nCloseSessionID]
+			if bExist == false || pSession == nil {
+				break
+			}
+			pSession.mConn.Close()
+			close(pSession.mChWrite)
+			nSID := pSession.mSessionID
+			delete(pOwn.mSessionMap, nSID)
+			if pOwn.mCallBackDisconnect != nil {
+				pOwn.mCallBackDisconnect(nSID)
+			}
+
+		case pNewConn := <-pOwn.mAcceptConnChannel:
+			pSession := pOwn.newSession(pNewConn)
+			pOwn.mSessionMap[pSession.mSessionID] = pSession
+			go pOwn.simulConnectionRead(pSession)
+			go pOwn.simulConnectionWrite(pSession)
+			if pOwn.mCallBackConnect != nil {
+				pOwn.mCallBackConnect(pSession.mSessionID)
+			}
+
+		default:
+			bDeal = false
 		}
 	}
 
-	select {
-	case nCloseSessionID := <-pOwn.mNotifyCloseChannel:
-		pSession, bExist := pOwn.mSessionMap[nCloseSessionID]
-		if bExist == false || pSession == nil {
-			break
-		}
-		pSession.mConn.WriteMessage(ws.CloseMessage, nil)
-		pSession.mConn.Close()
-		close(pSession.mChWrite)
-		nSID := pSession.mSessionID
-		delete(pOwn.mSessionMap, nSID)
-		if pOwn.mCallBackDisconnect != nil {
-			pOwn.mCallBackDisconnect(nSID)
-		}
+	//读数据
+	nMsgCount := int32(0)
+	bDeal = true
+	for bDeal == true {
+		select {
+		case pMsg := <-pOwn.mRecvDataChannel:
+			if pOwn.mCallBackReceive != nil {
+				pOwn.mCallBackReceive(pMsg.mSessionID, pMsg.mData, pMsg.mLen)
+			}
+			nMsgCount++
+			if aMaxNumPerDeal > 0 && nMsgCount >= aMaxNumPerDeal {
+				bDeal = false
+				break
+			}
+			continue
 
-	case pNewConn := <-pOwn.mAcceptConnChannel:
-		pSession := pOwn.newSession(pNewConn)
-		pOwn.mSessionMap[pSession.mSessionID] = pSession
-		go pOwn.simulConnectionRead(pSession)
-		go pOwn.simulConnectionWrite(pSession)
-		if pOwn.mCallBackConnect != nil {
-			pOwn.mCallBackConnect(pSession.mSessionID)
-		}
+		default:
+			bDeal = false
 
-	default:
-		break
+		}
 	}
-
 }
 
 //Write export
@@ -151,7 +157,7 @@ func (pOwn *WSReactor) newSession(aNewConn *ws.Conn) *sWSSession {
 	pOwn.mSessionIDGenerater++
 	pSession.mSessionID = pOwn.mSessionIDGenerater
 	pSession.mConn = aNewConn
-	pSession.mChWrite = make(chan []byte, 1024)
+	pSession.mChWrite = make(chan []byte, cSessionWriteChanLen)
 	pSession.mReadBuffer = make([]byte, cSessionReadBufLen)
 	return pSession
 }
@@ -182,7 +188,7 @@ func (pOwn *WSReactor) simulConnectionRead(aSession *sWSSession) {
 func (pOwn *WSReactor) simulConnectionWrite(aSession *sWSSession) {
 	ticker := time.NewTicker(cPingPeriod)
 	defer ticker.Stop()
-	for true {
+	for {
 		select {
 		case pBuffer, chErr := <-aSession.mChWrite:
 			if chErr == false {

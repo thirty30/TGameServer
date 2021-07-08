@@ -22,3 +22,4 @@ func RandUint32Range(aMin uint32, aMax uint32) uint32 {
 	}
 	return rand.Uint32()%(aMax-aMin) + aMin
 }
+

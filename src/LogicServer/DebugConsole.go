@@ -10,6 +10,5 @@ func debugCmdCallBack(aCmd string) {
 			}
 			pMonitor.statisticTime()
 		}
-		break
 	}
 }
