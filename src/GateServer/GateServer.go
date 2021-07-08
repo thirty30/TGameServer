@@ -129,6 +129,9 @@ func (pOwn *GateServer) onDisconnect(aSessionID uint64) {
 		msgSend.Value = aSessionID
 		pOwn.sendMsgToLogic(aSessionID, tp.GATE_2_LOGIC_KICK_SESSION, &msgSend)
 	}
+	if aSessionID == pOwn.mLogicSessionID {
+		_LOG(LT_ERROR, "Logic Server disconnented!")
+	}
 }
 
 func (pOwn *GateServer) onReceive(aSessionID uint64, aData []byte, aDataLen uint32) {
