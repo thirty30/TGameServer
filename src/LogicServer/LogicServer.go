@@ -126,6 +126,7 @@ func (pOwn *LogicServer) Run() {
 //Clear export
 func (pOwn *LogicServer) Clear() {
 	//pOwn.mDBManager.Clear()
+	pOwn.mNet.Clear()
 	pOwn.mLogManager.Clear()
 }
 

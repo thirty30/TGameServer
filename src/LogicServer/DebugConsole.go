@@ -10,5 +10,10 @@ func debugCmdCallBack(aCmd string) {
 			}
 			pMonitor.statisticTime()
 		}
+	case "close":
+		{
+			gServerSingleton.mRun = false
+			_LOG(LT_LOG, "close logic server")
+		}
 	}
 }

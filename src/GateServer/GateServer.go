@@ -103,6 +103,7 @@ func (pOwn *GateServer) Run() {
 
 //Clear exported
 func (pOwn *GateServer) Clear() {
+	pOwn.mNet.Clear()
 	pOwn.mLogManager.Clear()
 }
 

@@ -19,6 +19,7 @@ type sTCPSession struct {
 //TCPReactor export
 type TCPReactor struct {
 	mListenPort         uint16
+	mListener           *net.TCPListener
 	mSessionIDGenerater uint64
 	mSessionMap         map[uint64]*sTCPSession //连接关系
 	mAcceptConnChannel  chan *net.TCPConn       //接收到的连接管道
@@ -58,6 +59,24 @@ func (pOwn *TCPReactor) RegisterCallBack(
 	pOwn.mCallBackGetPacketSize = aOnGetPackageSize
 }
 
+func (pOwn *TCPReactor) Clear() {
+	pOwn.mListener.Close()
+	for _, v := range pOwn.mSessionMap {
+		v.mConn.Close()
+		close(v.mChWrite)
+	}
+
+	pOwn.mListenPort = 0
+	pOwn.mSessionIDGenerater = 0
+	pOwn.mSessionMap = nil
+	close(pOwn.mAcceptConnChannel)
+	pOwn.mAcceptConnChannel = nil
+	close(pOwn.mNotifyCloseChannel)
+	pOwn.mNotifyCloseChannel = nil
+	close(pOwn.mRecvDataChannel)
+	pOwn.mRecvDataChannel = nil
+}
+
 //Listen export
 func (pOwn *TCPReactor) Listen(aPort uint16) error {
 	pOwn.mListenPort = aPort
@@ -66,12 +85,12 @@ func (pOwn *TCPReactor) Listen(aPort uint16) error {
 	if err != nil {
 		return err
 	}
-	pListener, err := net.ListenTCP("tcp", pAddr)
+	pOwn.mListener, err = net.ListenTCP("tcp", pAddr)
 	if err != nil {
 		return err
 	}
 	for i := 0; i < 10; i++ {
-		go pOwn.simulAccpet(pListener)
+		go pOwn.simulAccpet()
 	}
 	return nil
 }
@@ -160,11 +179,11 @@ func (pOwn *TCPReactor) Close(aSessionID uint64, aMilliDelay int) {
 	go pOwn.simulClose(aSessionID, aMilliDelay)
 }
 
-func (pOwn *TCPReactor) simulAccpet(aListener *net.TCPListener) {
+func (pOwn *TCPReactor) simulAccpet() {
 	for {
-		pConn, err := aListener.AcceptTCP()
+		pConn, err := pOwn.mListener.AcceptTCP()
 		if err != nil {
-			continue
+			break
 		}
 		pOwn.mAcceptConnChannel <- pConn
 	}
