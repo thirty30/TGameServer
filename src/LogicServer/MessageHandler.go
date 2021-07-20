@@ -15,7 +15,7 @@ func (pOwn *LogicServer) bindHandler(aMsgID int32, aHandler msgHandler) {
 //注册回调函数
 func (pOwn *LogicServer) registerHandler() {
 	pOwn.bindHandler(tp.GATE_2_LOGIC_REGISTER, pOwn.handlerGateConnected)
-	pOwn.bindHandler(tp.GATE_2_LOGIC_TRANSFER_CLIENT, pOwn.handlerReDispathMsg)
+	pOwn.bindHandler(tp.GATE_2_LOGIC_TRANSFER_CLIENT, pOwn.handlerRedispathMsg)
 	//pOwn.bindHandler(tp.GATE_2_LOGIC_KICK_SESSION, pOwn.handlerKickSession)
 	pOwn.bindHandler(tp.C2S_TEST, pOwn.handlerTest)
 }
@@ -25,7 +25,7 @@ func (pOwn *LogicServer) handlerGateConnected(aSessionID uint64, aBuffer []byte,
 	_LOG(LT_LOG, "GateServer is connected!")
 }
 
-func (pOwn *LogicServer) handlerReDispathMsg(aSessionID uint64, aBuffer []byte, aSize uint32) {
+func (pOwn *LogicServer) handlerRedispathMsg(aSessionID uint64, aBuffer []byte, aSize uint32) {
 	//|--8 sid--|--9 head--|--n body--|
 	//client sid
 	nClientSessionID := binary.BigEndian.Uint64(aBuffer)

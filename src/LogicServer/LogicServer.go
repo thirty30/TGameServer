@@ -3,6 +3,7 @@ package logicserver
 import (
 	rof "Rof"
 	tcore "TCore"
+	tdb "TCore/TDBManager"
 	tnet "TNet"
 	tp "TProtocol"
 	"encoding/binary"
@@ -45,7 +46,7 @@ type LogicServer struct {
 	mLogManager    tcore.TLog
 	mRofManager    rof.RofManager
 	mBonusManager  sBonusManager
-	mDBManager     sDBManager
+	mDBManager     tdb.TDBManager
 	mMsgHandlerMap map[int32]msgHandler
 	mSessionMgr    sSessionManager
 
@@ -87,9 +88,9 @@ func (pOwn *LogicServer) Init() bool {
 
 	//init db
 	pConfig := pOwn.mConfig
-	err = pOwn.mDBManager.init(pConfig.DBPath, pConfig.DBPort, pConfig.DBName, pConfig.DBUser, pConfig.DBPwd, cDBCryptoKey)
+	err = pOwn.mDBManager.Init(pConfig.DBPath, pConfig.DBPort, "admin", pConfig.DBName, pConfig.DBUser, pConfig.DBPwd, cDBCryptoKey)
 	if err != nil {
-		_LOG(LT_ERROR, "Init db manager fail,"+err.Error())
+		_LOG(LT_ERROR, "Init db manager fail, "+err.Error())
 		return false
 	}
 
@@ -105,7 +106,23 @@ func (pOwn *LogicServer) Init() bool {
 	}
 
 	_LOG(LT_LOG, "LogicServer started...")
+
+	pOwn.dbTest()
 	return true
+}
+
+func (pOwn *LogicServer) dbTest() {
+	pObj := new(sDBPlayer)
+	pObj.PlayerID = 1
+	pObj.UserID = "3333abcdefg"
+	pObj.Renamed = true
+	pObj.PlayerName = "11111mmmmkkkk"
+	pObj.OfflineTime = tcore.GetNowTimeStamp()
+	pOwn.mDBManager.SavePlayerData(pObj.PlayerID, cDBTablePlayer, pObj, pOwn.dbTestCallback, pObj.PlayerID)
+}
+
+func (pOwn *LogicServer) dbTestCallback(aResData interface{}, aCustomParm interface{}, aError error) {
+	_LOG(LT_DEBUG, "dbTest callback playerID: %d", aCustomParm.(uint64))
 }
 
 //Run export
@@ -114,7 +131,7 @@ func (pOwn *LogicServer) Run() {
 		st := time.Now()
 
 		pOwn.mNet.EventDispatch(1000)
-		pOwn.mDBManager.eventDispatch()
+		pOwn.mDBManager.EventDispatch(10000)
 
 		lt := 20 - time.Since(st).Milliseconds() //服务器每秒50帧
 		if lt > 0 {
@@ -227,7 +244,7 @@ func (pOwn *LogicServer) getRofManager() *rof.RofManager {
 	return &pOwn.mRofManager
 }
 
-func (pOwn *LogicServer) getDBManager() *sDBManager {
+func (pOwn *LogicServer) getDBManager() *tdb.TDBManager {
 	return &pOwn.mDBManager
 }
 
