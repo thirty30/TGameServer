@@ -106,23 +106,7 @@ func (pOwn *LogicServer) Init() bool {
 	}
 
 	_LOG(LT_LOG, "LogicServer started...")
-
-	pOwn.dbTest()
 	return true
-}
-
-func (pOwn *LogicServer) dbTest() {
-	pObj := new(sDBPlayer)
-	pObj.PlayerID = 1
-	pObj.UserID = "3333abcdefg"
-	pObj.Renamed = true
-	pObj.PlayerName = "11111mmmmkkkk"
-	pObj.OfflineTime = tcore.GetNowTimeStamp()
-	pOwn.mDBManager.SavePlayerData(pObj.PlayerID, cDBTablePlayer, pObj, pOwn.dbTestCallback, pObj.PlayerID)
-}
-
-func (pOwn *LogicServer) dbTestCallback(aResData interface{}, aCustomParm interface{}, aError error) {
-	_LOG(LT_DEBUG, "dbTest callback playerID: %d", aCustomParm.(uint64))
 }
 
 //Run export
@@ -131,7 +115,7 @@ func (pOwn *LogicServer) Run() {
 		st := time.Now()
 
 		pOwn.mNet.EventDispatch(1000)
-		pOwn.mDBManager.EventDispatch(10000)
+		pOwn.mDBManager.EventDispatch(1000)
 
 		lt := 20 - time.Since(st).Milliseconds() //服务器每秒50帧
 		if lt > 0 {

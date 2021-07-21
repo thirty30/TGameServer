@@ -3,8 +3,8 @@ package tdbmanager
 import (
 	"context"
 	"strconv"
-	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -43,13 +43,10 @@ func (pOwn *TDBManager) Init(aPath string, aPort int32, aAuth string, aDBName st
 		if err != nil {
 			return err
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		err = client.Connect(ctx)
+		err = client.Connect(context.TODO())
 		if err != nil {
-			cancel()
 			return err
 		}
-		cancel()
 
 		pWorker := new(sDBWorker)
 		pOwn.mPlayerDataWorkers = append(pOwn.mPlayerDataWorkers, pWorker)
@@ -67,13 +64,11 @@ func (pOwn *TDBManager) Init(aPath string, aPort int32, aAuth string, aDBName st
 		if err != nil {
 			return err
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		err = client.Connect(ctx)
+
+		err = client.Connect(context.TODO())
 		if err != nil {
-			cancel()
 			return err
 		}
-		cancel()
 
 		pOwn.mPublicDataWorker = new(sDBWorker)
 		pOwn.mPublicDataWorker.init(-1, client.Database(aDBName))
@@ -117,6 +112,28 @@ func (pOwn *TDBManager) EventDispatch(aProcessNum int32) {
 			break
 		}
 	}
+
+	for {
+		bEmpty := true
+		select {
+		case pTask := <-pOwn.mPublicDataWorker.mDoneTaskList:
+			{
+				bEmpty = false
+				if pTask.mCallBack == nil {
+					break
+				}
+				pTask.mCallBack(pTask.mData, pTask.mCustomParm, pTask.mError)
+			}
+		default:
+			{
+				break
+			}
+		}
+
+		if bEmpty == true {
+			break
+		}
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -133,7 +150,7 @@ func (pOwn *TDBManager) pushPlayerDataTask(
 	pTask := new(sDBTask)
 	pTask.mTaskType = aTaskType
 	pTask.mCollectionName = aCollectionName
-	pTask.mCondition = aPlayerID
+	pTask.mFilter = bson.M{"_id": aPlayerID}
 	pTask.mData = aData
 	pTask.mCallBack = aCallBack
 	pTask.mCustomParm = aCustomParm
@@ -176,7 +193,7 @@ func (pOwn *TDBManager) LoadPlayerData(aPlayerID uint64, aCollectionName string,
 func (pOwn *TDBManager) pushPublicDataTask(
 	aTaskType int8,
 	aCollectionName string,
-	aCondition interface{},
+	aFilter interface{},
 	aData interface{},
 	aCallBack finishTaskCallBack,
 	aCustomParm interface{}) {
@@ -184,7 +201,7 @@ func (pOwn *TDBManager) pushPublicDataTask(
 	pTask := new(sDBTask)
 	pTask.mTaskType = aTaskType
 	pTask.mCollectionName = aCollectionName
-	pTask.mCondition = aCondition
+	pTask.mFilter = aFilter
 	pTask.mData = aData
 	pTask.mCallBack = aCallBack
 	pTask.mCustomParm = aCustomParm
@@ -193,28 +210,37 @@ func (pOwn *TDBManager) pushPublicDataTask(
 
 //SavePublicDataByID export
 func (pOwn *TDBManager) SavePublicDataByID(aCollectionName string, aID interface{}, aData interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
-	pOwn.pushPublicDataTask(cDBTaskUpsert, aCollectionName, aID, aData, aCallBack, aCustomParm)
+	filter := bson.M{"_id": aID}
+	pOwn.pushPublicDataTask(cDBTaskUpsert, aCollectionName, filter, aData, aCallBack, aCustomParm)
 }
 
 //LoadPublicDataByID export
 func (pOwn *TDBManager) LoadPublicDataByID(aCollectionName string, aID interface{}, aData interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
-	pOwn.pushPublicDataTask(cDBTaskFindOne, aCollectionName, aID, aData, aCallBack, aCustomParm)
+	filter := bson.M{"_id": aID}
+	pOwn.pushPublicDataTask(cDBTaskFindOne, aCollectionName, filter, aData, aCallBack, aCustomParm)
 }
 
-//LoadPublicData export
-func (pOwn *TDBManager) LoadPublicData(aCollectionName string, aCondition interface{}, aData interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
-	pOwn.pushPublicDataTask(cDBTaskFind, aCollectionName, aCondition, aData, aCallBack, aCustomParm)
+//LoadPublicDataAll export
+func (pOwn *TDBManager) LoadPublicDataAll(aCollectionName string, aData interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
+	filter := bson.M{}
+	pOwn.pushPublicDataTask(cDBTaskFind, aCollectionName, filter, aData, aCallBack, aCustomParm)
 }
 
 //RemovePublicDataByID export
 func (pOwn *TDBManager) RemovePublicDataByID(aCollectionName string, aID interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
-	pOwn.pushPublicDataTask(cDBTaskRemoveOne, aCollectionName, aID, nil, aCallBack, aCustomParm)
+	filter := bson.M{"_id": aID}
+	pOwn.pushPublicDataTask(cDBTaskRemoveOne, aCollectionName, filter, nil, aCallBack, aCustomParm)
 }
 
+//LoadPublicData export
+//func (pOwn *TDBManager) LoadPublicData(aCollectionName string, aFilter interface{}, aData interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
+//	pOwn.pushPublicDataTask(cDBTaskFind, aCollectionName, aFilter, aData, aCallBack, aCustomParm)
+//}
+
 //RemovePublicData export
-func (pOwn *TDBManager) RemovePublicData(aCollectionName string, aCondition interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
-	pOwn.pushPublicDataTask(cDBTaskRemove, aCollectionName, aCondition, nil, aCallBack, aCustomParm)
-}
+//func (pOwn *TDBManager) RemovePublicData(aCollectionName string, aFilter interface{}, aCallBack finishTaskCallBack, aCustomParm interface{}) {
+//	pOwn.pushPublicDataTask(cDBTaskRemove, aCollectionName, aFilter, nil, aCallBack, aCustomParm)
+//}
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //保留接口
@@ -222,7 +248,7 @@ func (pOwn *TDBManager) RemovePublicData(aCollectionName string, aCondition inte
 func (pOwn *TDBManager) pushTask(
 	aTaskType int8,
 	aCollectionName string,
-	aCondition interface{},
+	aFilter interface{},
 	aData interface{},
 	aCallBack finishTaskCallBack,
 	aCustomParm interface{}) {
@@ -230,7 +256,7 @@ func (pOwn *TDBManager) pushTask(
 	pTask := new(sDBTask)
 	pTask.mTaskType = aTaskType
 	pTask.mCollectionName = aCollectionName
-	pTask.mCondition = aCondition
+	pTask.mFilter = aFilter
 	pTask.mData = aData
 	pTask.mCallBack = aCallBack
 	pTask.mCustomParm = aCustomParm

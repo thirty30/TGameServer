@@ -2,10 +2,8 @@ package tdbmanager
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -34,9 +32,7 @@ func (pOwn *sDBWorker) start() {
 }
 
 func (pOwn *sDBWorker) clear() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	defer cancel()
-	pOwn.mDBClient.Disconnect(ctx)
+	pOwn.mDBClient.Disconnect(context.Background())
 }
 
 func (pOwn *sDBWorker) loop() {
@@ -44,56 +40,42 @@ func (pOwn *sDBWorker) loop() {
 		pTask := <-pOwn.mPreTaskList
 		pCollection := pOwn.mDBSession.Collection(pTask.mCollectionName)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-
 		switch pTask.mTaskType {
 		case cDBTaskUpsert:
 			{
-				//_, pTask.mError = pCollection.InsertOne(ctx, pTask.mData)
-				filter := bson.M{"_id": pTask.mCondition}
-				_, pTask.mError = pCollection.ReplaceOne(ctx, filter, pTask.mData, options.Replace().SetUpsert(true))
-				if pTask.mError != nil {
-					fmt.Println(pTask.mError.Error())
-				}
+				_, pTask.mError = pCollection.ReplaceOne(context.TODO(), pTask.mFilter, pTask.mData, options.Replace().SetUpsert(true))
 			}
 		case cDBTaskRemoveOne:
 			{
-				_, pTask.mError = pCollection.DeleteOne(ctx, pTask.mCondition)
+				_, pTask.mError = pCollection.DeleteOne(context.TODO(), pTask.mFilter)
 			}
 		case cDBTaskRemove:
 			{
-				_, pTask.mError = pCollection.DeleteMany(ctx, pTask.mCondition)
+				_, pTask.mError = pCollection.DeleteMany(context.TODO(), pTask.mFilter)
 			}
 		case cDBTaskFindOne:
 			{
-				pRes := pCollection.FindOne(ctx, pTask.mCondition)
-				err := pRes.Decode(pTask.mData)
-				if err != nil {
-					pTask.mError = err
-				}
+				pRes := pCollection.FindOne(context.TODO(), pTask.mFilter)
+				pTask.mError = pRes.Decode(pTask.mData)
 			}
 		case cDBTaskFind:
 			{
-				pCursor, err := pCollection.Find(ctx, pTask.mCondition)
+				pCursor, err := pCollection.Find(context.TODO(), pTask.mFilter)
 				if err != nil {
 					pTask.mError = err
 					break
 				}
-				err = pCursor.All(ctx, pTask.mData)
-				if err != nil {
-					pTask.mError = err
-				}
+				pTask.mError = pCursor.All(context.TODO(), pTask.mData)
 			}
 		case cDBTaskPing:
 			{
-				//ctxPing, cancelPing := context.WithTimeout(context.Background(), time.Second*10)
-				//cancelPing()
-				//pOwn.mDBClient.Ping(ctxPing, nil)
+				//pOwn.mDBClient.Ping(context.TODO(), nil)
+			}
+		case cDBTaskFinish:
+			{
+
 			}
 		}
-
-		cancel()
-
 		if pTask.mCallBack != nil {
 			pOwn.mDoneTaskList <- pTask
 		}

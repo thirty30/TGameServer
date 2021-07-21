@@ -19,4 +19,10 @@ type sDBPlayer struct {
 	Renamed     bool
 	PlayerName  string
 	OfflineTime int64
+	Bag         []*sDBBag
+}
+
+type sDBBag struct {
+	ID  int32
+	Num int32
 }

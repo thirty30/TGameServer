@@ -21,7 +21,7 @@ type finishTaskCallBack func(aResData interface{}, aCustomParm interface{}, aErr
 type sDBTask struct {
 	mTaskType       int8
 	mCollectionName string
-	mCondition      interface{}
+	mFilter         interface{}
 	mData           interface{}
 	mCallBack       finishTaskCallBack
 	mCustomParm     interface{}
